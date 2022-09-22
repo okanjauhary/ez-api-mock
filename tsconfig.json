@@ -1,0 +1,31 @@
+{
+    "compilerOptions": {
+      "module": "commonjs",
+      "esModuleInterop": true,
+      "target": "es6",
+      "noImplicitAny": true,
+      "removeComments": true,
+      "alwaysStrict": true,
+      "allowUnreachableCode": false,
+      "noImplicitThis": true,
+      "noUnusedLocals": true,
+      "noUnusedParameters": true,
+      "noImplicitReturns": true,
+      "noFallthroughCasesInSwitch": true,
+      "forceConsistentCasingInFileNames": true,
+      "strict": true,
+      "moduleResolution": "node",
+      "sourceMap": true,
+      "baseUrl": ".",
+      "outDir": "dist",
+      "resolveJsonModule": true,
+      "typeRoots": [                            /* List of folders to include type definitions from. */
+        "node_modules/@types"
+      ],
+      "paths": {
+        "*": ["node_modules/*"]
+      }
+    },
+    "include": ["src/**/*"],
+    "exclude": ["node_modules", "dist"]
+  }
