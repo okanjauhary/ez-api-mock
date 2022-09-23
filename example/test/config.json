@@ -1,0 +1,19 @@
+{
+  "get": {
+    "200": {
+      "queries": [
+        {
+          "offset": 0,
+          "limit": 10,
+          "file": "response2.json"
+        }
+      ],
+      "file": "response1.json"
+    }
+  },
+  "post": {
+    "201": {
+      "file": "response3.json"
+    }
+  }
+}
