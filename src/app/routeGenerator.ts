@@ -50,7 +50,7 @@ const generateRouteList = (
     }
   });
 
-  return list;
+  return list.sort(({ url }) => (/\:\w+/.test(url) ? 1 : -1));
 };
 
 const generateRoute = (rootMockPath: string): Router => {
