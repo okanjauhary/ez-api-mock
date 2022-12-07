@@ -29,76 +29,103 @@ const getConfig = async (apiDir: string): Promise<any> => {
   return config ? JSON.parse(config) : null;
 };
 
-const generateRoute = (rootMockPath: string): any => {
-  const endpointDirs = getDirs(rootMockPath) as Dirent[];
+type RouteList = {
+  url: string;
+  filePath: string;
+};
+
+const generateRouteList = (
+  rootMockPath: string,
+  prevUrl: string = '',
+): RouteList[] => {
+  const dirs = getDirs(rootMockPath) as Dirent[];
+  let list: RouteList[] = [];
+
+  dirs.forEach((dir: Dirent) => {
+    if (dir.isDirectory()) {
+      const url = `${prevUrl}/${dir.name}`;
+      const filePath = path.join(rootMockPath, dir.name);
+      const nestedRouteList = generateRouteList(filePath, url);
+      list = [...list, { url, filePath }, ...nestedRouteList];
+    }
+  });
+
+  return list.sort(({ url }) => (/\:\w+/.test(url) ? 1 : -1));
+};
+
+const generateRoute = (rootMockPath: string): Router => {
   const router: Router = Router();
+  const routeList = generateRouteList(rootMockPath);
 
-  endpointDirs.forEach(async (endpointDir: Dirent) => {
-    if (endpointDir.isDirectory()) {
-      const endpointDirPath = path.join(rootMockPath, endpointDir.name);
-      const config = await getConfig(endpointDirPath);
+  routeList.forEach(async (list) => {
+    const config = await getConfig(list.filePath);
 
-      if (config) {
-        const methods = Object.values(Methods);
-        const availableMethods = unique([
-          ...Object.keys(config),
-          'get',
-        ]) as typeof methods;
+    if (config) {
+      const methods = Object.values(Methods);
+      const availableMethods = unique([
+        ...Object.keys(config),
+        'get',
+      ]) as typeof methods;
 
-        availableMethods.forEach((method) => {
-          if (!methods.includes(method)) return;
+      availableMethods.forEach((method) => {
+        if (!methods.includes(method)) return;
 
-          (router as any)[method](
-            `/${endpointDir.name}`,
-            async (req: Request, res: Response, next: NextFunction) => {
-              const { code, timeout } = getEzHeader(req.headers);
-              const currentConfig = config[method][code];
-              const reqQuery = req.query as any;
+        (router as any)[method](
+          list.url,
+          async (req: Request, res: Response, next: NextFunction) => {
+            const { code, timeout } = getEzHeader(req.headers);
+            const currentConfig = config[method][code];
+            const reqQuery = req.query as any;
 
-              if (!currentConfig) {
-                return next(createError(500, 'The config is invalid'));
-              }
+            if (!currentConfig) {
+              return next(createError(500, 'The config is invalid'));
+            }
 
-              let responsePath = path.join(
-                rootMockPath,
-                endpointDir.name,
-                currentConfig.file,
-              );
+            let responsePath = path.join(list.filePath, currentConfig.file);
 
-              if (currentConfig.queries) {
-                for (const query of currentConfig.queries) {
-                  const availableQuery = { ...query };
-                  delete availableQuery.file;
-                  const queryKeys = [...Object.keys(availableQuery)] as any;
+            if (currentConfig.queries) {
+              for (const query of currentConfig.queries) {
+                const availableQuery = { ...query };
+                delete availableQuery.file;
+                const queryKeys = [...Object.keys(availableQuery)] as any;
 
-                  if (
-                    queryKeys.every((key: any) => query[key] == reqQuery[key])
-                  ) {
-                    responsePath = path.join(
-                      rootMockPath,
-                      endpointDir.name,
-                      (query as any).file,
-                    );
-                  }
+                if (
+                  queryKeys.every((key: any) => query[key] == reqQuery[key])
+                ) {
+                  responsePath = path.join(list.filePath, (query as any).file);
                 }
               }
+            }
 
-              try {
-                const response = await getFileContent(responsePath, 'utf-8');
-                setTimeout(() => {
-                  res.status(code).json(JSON.parse(response));
-                }, timeout);
-              } catch (error: any) {
-                next(createError(error));
-              }
-            },
-          );
-        });
-      } else {
-        console.warn(
-          `\nThe ${endpointDirPath}\n should have the config.json file`,
+            try {
+              const response = await getFileContent(responsePath, 'utf-8');
+              setTimeout(() => {
+                res.status(code).json(JSON.parse(response));
+              }, timeout);
+            } catch (error: any) {
+              next(createError(error));
+            }
+          },
         );
-      }
+      });
+    } else {
+      router.get(
+        list.url,
+        async (req: Request, res: Response, next: NextFunction) => {
+          const { code = 200, timeout } = getEzHeader(req.headers);
+          try {
+            const response = await getFileContent(
+              path.join(list.filePath, 'index.json'),
+              'utf-8',
+            );
+            setTimeout(() => {
+              res.status(code).json(JSON.parse(response));
+            }, timeout);
+          } catch (error: any) {
+            next(createError(error));
+          }
+        },
+      );
     }
   });
 
